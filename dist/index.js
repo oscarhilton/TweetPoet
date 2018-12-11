@@ -7,12 +7,15 @@ var syllable = require("syllable");
 var _require = require("./tweets"),
     tweets = _require.tweets;
 
+var axios = require("axios");
+var readlineSync = require("readline-sync");
+var chalk = require("chalk");
+
 // Set up user's line
+var myArgs = process.argv.slice(2);
+var sentence = myArgs.join(" ");
 
-
-var sentence = "Tell me it's not true";
-var splitSentence = sentence.split(" ");
-var wordToBeRhymed = splitSentence[splitSentence.length - 1];
+var thePoem = [];
 
 var getSentenceSyllables = function getSentenceSyllables(sentenceToUse) {
   var split = sentenceToUse.split(" ");
@@ -51,13 +54,12 @@ cleanTweets = cleanTweets.map(function (tweet) {
       return tweet.replace("has", "I have");
     case "isnt":
       return tweet.replace("isnt", "I'm not");
-    case "is":
-      return tweet.replace("is", "I'm");
     default:
       return tweet;
   }
 });
 
+// Put tweets into rhyme object
 var rhymeTweets = cleanTweets.map(function (tweet) {
   var splitTweet = tweet.split(" ");
   return {
@@ -66,28 +68,79 @@ var rhymeTweets = cleanTweets.map(function (tweet) {
   };
 });
 
-getRhymes(wordToBeRhymed).then(function (rhymes) {
-  if (rhymeTweets.length < 1) {
-    return console.warn("No rhymeTweets found");
+// Call the rhyme API
+var getThingsThatRhymeWith = async function getThingsThatRhymeWith(word) {
+  try {
+    var res = await axios.get("https://api.datamuse.com/words?rel_rhy=" + word + "&max=1000");
+    return res.data.map(function (word) {
+      return word.word;
+    });
+  } catch (e) {
+    console.log(e);
   }
-  var found = rhymeTweets.filter(function (tweet) {
-    return rhymes.indexOf(tweet.lastWord) > -1 && tweet.lastWord !== wordToBeRhymed && !wordToBeRhymed.includes(tweet.lastWord) && !tweet.lastWord.includes(wordToBeRhymed) && getSyllableRange(getSentenceSyllables(sentence), getSentenceSyllables(tweet.tweet));
+};
+
+var LargeConsole = function LargeConsole(log) {
+  console.log(chalk.green("********************************"));
+  console.log("                           ");
+  console.log("                           ");
+  log.map(function (line) {
+    return console.log(chalk.yellow(line));
   });
-  if (found.length < 1) return console.log("No foundtweets found");
-  return outputNextLine(found);
-}).catch(function (e) {
-  return console.warn(e);
-});
+  console.log("                           ");
+  console.log("                           ");
+  console.log(chalk.green("********************************"));
+};
 
 // Make sentence titlecase
 function toTitleCase(str) {
   return str.replace(str[0], str[0].toUpperCase());
 }
 
-var outputNextLine = function outputNextLine(foundArray) {
-  var randomLine = foundArray[Math.floor(Math.random() * foundArray.length)];
-  // console.log(foundArray, randomLine);
+// Make a new line of the poem
+var startPoemLine = function startPoemLine() {
+  var sentence = readlineSync.question("*** Input a line to the poem: *** ");
 
-  console.log(toTitleCase(sentence));
-  console.log(toTitleCase(randomLine.tweet));
+  var splitSentence = sentence.split(" ");
+  var wordToBeRhymed = splitSentence[splitSentence.length - 1];
+
+  getThingsThatRhymeWith(wordToBeRhymed).then(function (rhymes) {
+    if (rhymeTweets.length < 1) {
+      return console.warn("No rhymeTweets found");
+    }
+
+    var found = rhymeTweets.filter(function (tweet) {
+      return rhymes.indexOf(tweet.lastWord) !== -1 && tweet.lastWord !== wordToBeRhymed && !wordToBeRhymed.includes(tweet.lastWord) && !tweet.lastWord.includes(wordToBeRhymed) && getSyllableRange(getSentenceSyllables(sentence), getSentenceSyllables(tweet.tweet));
+    });
+    if (found.length < 1) {
+      console.log(chalk.red("Oh no, no good rhyme for that line :-("));
+      return startPoemLine();
+    }
+    var randomLine = found[Math.floor(Math.random() * found.length)];
+    return addToPoem(toTitleCase(sentence), toTitleCase(randomLine.tweet));
+  }).catch(function (e) {
+    return console.warn(e);
+  });
 };
+
+// Add the line to the poem
+var addToPoem = function addToPoem(line1, line2) {
+  thePoem.push(line1);
+  thePoem.push(line2);
+
+  LargeConsole(thePoem);
+
+  if (readlineSync.keyInYN("Do you want to finish the poem?")) {
+    console.log("Poem finished!");
+    thePoem = [];
+    if (readlineSync.keyInYN("Want to write another poem?")) {
+      startPoemLine();
+    } else {
+      console.log("Bye bye!");
+    }
+  } else {
+    startPoemLine();
+  }
+};
+
+startPoemLine();
