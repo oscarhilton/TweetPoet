@@ -11,9 +11,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^0.18.0",
+    "chalk": "^2.4.1",
     "express": "^4.15.2",
     "get-rhymes": "^2.0.0",
     "morgan": "^1.8.1",
+    "readline-sync": "^1.4.9",
     "retext": "^6.0.1",
     "retext-syllable": "^1.0.0",
     "rhyme-plus": "0.0.7",
